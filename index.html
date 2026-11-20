@@ -1,0 +1,868 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ISO 26262 Requirement Traceability &amp; Compliance Checker | Prototype</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --surface: #1e293b;
+      --surface-2: #273549;
+      --border: #334155;
+      --text: #f1f5f9;
+      --muted: #94a3b8;
+      --accent: #38bdf8;
+      --accent-hover: #0ea5e9;
+      --pass: #22c55e;
+      --pass-bg: rgba(34, 197, 94, 0.14);
+      --warn: #f59e0b;
+      --warn-bg: rgba(245, 158, 11, 0.14);
+      --err: #ef4444;
+      --err-bg: rgba(239, 68, 68, 0.14);
+      --qm: #64748b;
+      --asil-a: #3b82f6;
+      --asil-b: #10b981;
+      --asil-c: #f59e0b;
+      --asil-d: #ef4444;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans TC", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+      padding: 24px;
+    }
+    .container { max-width: 1280px; margin: 0 auto; }
+
+    header {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 16px;
+      padding-bottom: 20px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 24px;
+    }
+    .title-block h1 {
+      font-size: 1.55rem;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .badge-proto {
+      font-size: 0.72rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      padding: 3px 8px;
+      border-radius: 999px;
+      background: rgba(56, 189, 248, 0.15);
+      color: var(--accent);
+      border: 1px solid rgba(56, 189, 248, 0.35);
+    }
+    .subtitle {
+      color: var(--muted);
+      font-size: 0.9rem;
+      margin-top: 6px;
+    }
+    .author-tag {
+      font-size: 0.82rem;
+      color: var(--muted);
+      text-align: right;
+    }
+    .author-tag strong { color: var(--text); }
+
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      margin-bottom: 20px;
+      background: var(--surface);
+      padding: 12px 16px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+    }
+    .toolbar-label {
+      font-size: 0.82rem;
+      color: var(--muted);
+      font-weight: 600;
+      margin-right: 4px;
+    }
+    button, .btn-file {
+      background: var(--surface-2);
+      color: var(--text);
+      border: 1px solid var(--border);
+      padding: 7px 13px;
+      border-radius: 7px;
+      font-size: 0.83rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    button:hover, .btn-file:hover { border-color: var(--accent); color: var(--accent); }
+    button.primary {
+      background: var(--accent);
+      color: #0b1120;
+      border-color: var(--accent);
+      font-weight: 600;
+    }
+    button.primary:hover { background: var(--accent-hover); color: #0b1120; }
+    button.danger-sm {
+      background: transparent;
+      border: 1px solid transparent;
+      color: var(--muted);
+      padding: 4px 8px;
+      font-size: 0.8rem;
+    }
+    button.danger-sm:hover { color: var(--err); border-color: rgba(239, 68, 68, 0.4); }
+    .spacer { flex: 1; }
+
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+      gap: 14px;
+      margin-bottom: 24px;
+    }
+    .kpi-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px 16px;
+    }
+    .kpi-label { font-size: 0.78rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+    .kpi-value { font-size: 1.65rem; font-weight: 700; margin-top: 4px; }
+    .kpi-sub { font-size: 0.76rem; color: var(--muted); margin-top: 2px; }
+    .kpi-pass .kpi-value { color: var(--pass); }
+    .kpi-err .kpi-value { color: var(--err); }
+    .kpi-warn .kpi-value { color: var(--warn); }
+
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 18px;
+      margin-bottom: 20px;
+    }
+    .panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 14px;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .panel-title { font-size: 1rem; font-weight: 600; }
+    .panel-desc { font-size: 0.82rem; color: var(--muted); }
+
+    .table-wrap { overflow-x: auto; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+    }
+    th, td {
+      text-align: left;
+      padding: 9px 10px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: middle;
+    }
+    th {
+      color: var(--muted);
+      font-weight: 600;
+      font-size: 0.76rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      background: rgba(15, 23, 42, 0.45);
+    }
+    input[type="text"], select {
+      width: 100%;
+      background: var(--bg);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 6px 8px;
+      font-size: 0.84rem;
+      font-family: inherit;
+    }
+    input[type="text"]:focus, select:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+    input[type="checkbox"] {
+      width: 16px;
+      height: 16px;
+      accent-color: var(--accent);
+      cursor: pointer;
+    }
+
+    .pill {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 0.74rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+    }
+    .pill-QM { background: rgba(100,116,139,0.22); color: #cbd5e1; }
+    .pill-A  { background: rgba(59,130,246,0.22); color: #93c5fd; }
+    .pill-B  { background: rgba(16,185,129,0.22); color: #6ee7b7; }
+    .pill-C  { background: rgba(245,158,11,0.22); color: #fcd34d; }
+    .pill-D  { background: rgba(239,68,68,0.22); color: #fca5a5; }
+
+    .status-pass { background: var(--pass-bg); color: var(--pass); }
+    .status-warn { background: var(--warn-bg); color: var(--warn); }
+    .status-err  { background: var(--err-bg);  color: var(--err); }
+
+    .two-col {
+      display: grid;
+      grid-template-columns: 1.45fr 1fr;
+      gap: 20px;
+    }
+    @media (max-width: 960px) {
+      .two-col { grid-template-columns: 1fr; }
+    }
+
+    .finding-list { display: flex; flex-direction: column; gap: 10px; }
+    .finding {
+      border-radius: 8px;
+      padding: 11px 14px;
+      border-left: 4px solid;
+      background: rgba(15, 23, 42, 0.55);
+      font-size: 0.85rem;
+    }
+    .finding.err  { border-color: var(--err); }
+    .finding.warn { border-color: var(--warn); }
+    .finding.pass { border-color: var(--pass); }
+    .finding-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 4px;
+      gap: 8px;
+    }
+    .finding-rule { font-weight: 600; }
+    .finding-body { color: #cbd5e1; font-size: 0.83rem; }
+    .finding-tip  { color: var(--muted); font-size: 0.78rem; margin-top: 4px; }
+
+    .matrix-cell-hit {
+      background: rgba(56, 189, 248, 0.22);
+      color: var(--accent);
+      font-weight: 700;
+      text-align: center;
+    }
+    .matrix-cell-miss {
+      color: #475569;
+      text-align: center;
+    }
+
+    .modal-backdrop {
+      position: fixed; inset: 0;
+      background: rgba(2, 6, 23, 0.78);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      z-index: 50;
+    }
+    .modal-backdrop.open { display: flex; }
+    .modal {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      max-width: 760px;
+      width: 100%;
+      padding: 20px;
+    }
+    .modal textarea {
+      width: 100%;
+      height: 280px;
+      background: var(--bg);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 0.8rem;
+      margin: 12px 0;
+      resize: vertical;
+    }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 10px; }
+
+    footer {
+      margin-top: 28px;
+      padding-top: 16px;
+      border-top: 1px solid var(--border);
+      font-size: 0.78rem;
+      color: var(--muted);
+      display: flex;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="title-block">
+        <h1>
+          ISO 26262 Requirement Traceability Checker
+          <span class="badge-proto">Prototype v1.0</span>
+        </h1>
+        <p class="subtitle">
+          Automated verification for SG &rarr; FSR coverage, ASIL inheritance, Element ASIL roll-up, and "WHAT vs. HOW" compliance (ISO 26262-3 / Part 9).
+        </p>
+      </div>
+      <div class="author-tag">
+        Built by <strong>Joe (Mao-Lin) Chao</strong><br />
+        M.S. Candidate in EE, CYCU &middot; Automotive Functional Safety &amp; Process Automation
+      </div>
+    </header>
+
+    <div class="toolbar">
+      <span class="toolbar-label">Load Scenario:</span>
+      <button onclick="loadScenario('seooc')">Automotive SSD Controller (SEooC / ASIL-B)</button>
+      <button onclick="loadScenario('ev')">EV Propulsion System (Vehicle-Level)</button>
+      <span class="spacer"></span>
+      <button onclick="openLlmModal()">Generate LLM Audit Prompt</button>
+      <button onclick="exportMarkdownReport()">Export Audit Report (.md)</button>
+      <button class="primary" onclick="runAudit()">Run Compliance Audit</button>
+    </div>
+
+    <div class="kpi-grid" id="kpiGrid"></div>
+
+    <div class="panel">
+      <div class="panel-header">
+        <div>
+          <div class="panel-title">1. Safety Goals (SG) &mdash; ISO 26262-3 Clause 7</div>
+          <div class="panel-desc">Top-level safety requirements derived from HARA. Define <strong>WHAT</strong> to prevent, not HOW to implement.</div>
+        </div>
+        <button onclick="addSgRow()">+ Add Safety Goal</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th style="width: 110px;">SG ID</th>
+              <th>Safety Goal Description</th>
+              <th style="width: 120px;">ASIL</th>
+              <th style="width: 120px;">Coverage</th>
+              <th style="width: 56px;"></th>
+            </tr>
+          </thead>
+          <tbody id="sgTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">
+        <div>
+          <div class="panel-title">2. Functional Safety Requirements (FSR) &mdash; ISO 26262-3 Clause 8</div>
+          <div class="panel-desc">Each Safety Goal must have &ge; 1 FSR. Comma-separated SG IDs supported for shared FSRs.</div>
+        </div>
+        <button onclick="addFsrRow()">+ Add FSR</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th style="width: 110px;">FSR ID</th>
+              <th>FSR Description</th>
+              <th style="width: 115px;">Assigned ASIL</th>
+              <th style="width: 150px;">Allocated Element</th>
+              <th style="width: 165px;">Trace to SG ID(s)</th>
+              <th style="width: 105px;" title="ISO 26262-9 ASIL Decomposition">Decomposed?</th>
+              <th style="width: 56px;"></th>
+            </tr>
+          </thead>
+          <tbody id="fsrTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="two-col">
+      <div class="panel">
+        <div class="panel-header">
+          <div>
+            <div class="panel-title">3. Automated Audit Findings</div>
+            <div class="panel-desc">Rule-based checks: Coverage, Orphan Links, ASIL Inheritance, and WHAT-not-HOW.</div>
+          </div>
+        </div>
+        <div class="finding-list" id="findingsContainer"></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">
+          <div>
+            <div class="panel-title">4. Element ASIL Roll-up</div>
+            <div class="panel-desc">Highest ASIL assigned to each subsystem/element (drives HW/SW development rigor).</div>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Element / Subsystem</th>
+                <th>Allocated FSRs</th>
+                <th>Highest ASIL</th>
+              </tr>
+            </thead>
+            <tbody id="elementTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">
+        <div>
+          <div class="panel-title">5. Bidirectional Traceability Matrix (SG &times; FSR)</div>
+          <div class="panel-desc">Visual verification of many-to-many traceability between Safety Goals and Functional Safety Requirements.</div>
+        </div>
+      </div>
+      <div class="table-wrap" id="matrixContainer"></div>
+    </div>
+
+    <footer>
+      <div>Rules based on ISO 26262-3 (Concept Phase) &amp; ISO 26262-9 (ASIL Tailoring). Runs 100% locally in browser &mdash; zero data leaves your device.</div>
+      <div>Ideal for air-gapped / on-premise compliance workflows &amp; LLM-assisted review.</div>
+    </footer>
+  </div>
+
+  <!-- LLM Prompt Modal -->
+  <div class="modal-backdrop" id="llmModal">
+    <div class="modal">
+      <div class="panel-header" style="margin-bottom: 4px;">
+        <div class="panel-title">LLM Semantic Review Prompt (On-Premise / Local AI Ready)</div>
+        <button class="danger-sm" onclick="closeLlmModal()">&times; Close</button>
+      </div>
+      <p class="panel-desc">Copy this structured prompt into your internal LLM (e.g., local Llama / aiDAPTIV+) to perform deeper ambiguity, completeness, and SEooC assumption reviews.</p>
+      <textarea id="llmPromptText" readonly></textarea>
+      <div class="modal-actions">
+        <button onclick="copyLlmPrompt()">Copy Prompt</button>
+        <button class="primary" onclick="closeLlmModal()">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const ASIL_RANK = { "QM": 0, "A": 1, "B": 2, "C": 3, "D": 4 };
+    const RANK_TO_ASIL = ["QM", "A", "B", "C", "D"];
+
+    // Implementation-specific ("HOW") keywords that should generally not appear in SG or high-level FSRs
+    const HOW_KEYWORDS = [
+      "igbt", "mosfet", "register", "c code", "gpio", "spi", "i2c", "pcb",
+      "sram", "dram", "voltage divider", "resistor", "capacitor", "firmware",
+      "ldpc", "crc32", "watchdog timer ic", "adc channel", "pwm duty"
+    ];
+
+    const SCENARIOS = {
+      seooc: {
+        name: "Automotive SSD Controller (SEooC / ASIL-B)",
+        sgs: [
+          { id: "SG_001", desc: "Prevent undetected silent data corruption on safety-critical ADAS map/boot partitions.", asil: "B" },
+          { id: "SG_002", desc: "Prevent unannounced loss of read/write availability exceeding fault tolerant time interval (FTTI = 100ms).", asil: "B" },
+          { id: "SG_003", desc: "Prevent unauthorized firmware modification during OTA update or boot sequence.", asil: "A" },
+          { id: "SG_004", desc: "Prevent controller thermal runaway from causing permanent storage failure.", asil: "QM" }
+        ],
+        fsrs: [
+          { id: "FSR_001", desc: "Storage subsystem shall detect end-to-end data integrity errors along host-to-NAND path and report fault to Host SoC.", asil: "B", element: "Flash Controller", sgIds: "SG_001", decomp: false },
+          { id: "FSR_002", desc: "Controller shall monitor internal clock and execution health, entering safe state and alerting Host within FTTI.", asil: "A", element: "Safety Monitor", sgIds: "SG_002", decomp: false }, // Intentional ASIL mismatch error!
+          { id: "FSR_003", desc: "Boot loader shall verify cryptographic signature using internal SRAM buffer and SPI flash register before execution.", asil: "A", element: "Security Engine", sgIds: "SG_003", decomp: false }, // Intentional HOW warning!
+          { id: "FSR_004", desc: "Controller shall throttle I/O throughput when internal junction temperature exceeds threshold.", asil: "QM", element: "Thermal Manager", sgIds: "SG_099", decomp: false } // Intentional orphan link + leaves SG_004 uncovered!
+        ]
+      },
+      ev: {
+        name: "EV Propulsion System (Vehicle-Level)",
+        sgs: [
+          { id: "SG_001", desc: "The Electric Propulsion System shall prevent un-commanded vehicle acceleration > 1.5 m/s^2 for > 500ms.", asil: "B" },
+          { id: "SG_002", desc: "The Electric Propulsion System shall prevent un-commanded vehicle movement > 0.1m.", asil: "B" },
+          { id: "SG_008", desc: "Prevent unintended reverse motion when forward drive is selected.", asil: "B" },
+          { id: "SG_010", desc: "Prevent HV battery over-charging during external AC/DC charging.", asil: "A" },
+          { id: "SG_014", desc: "Prevent vehicle launch while connected to external charging equipment (EVSE).", asil: "A" }
+        ],
+        fsrs: [
+          { id: "FSR_001", desc: "The VCU shall correctly interpret driver demanded direction of travel (forwards / backwards).", asil: "A", element: "VCU", sgIds: "SG_008", decomp: false }, // Intentional ASIL mismatch (SG_008 is B)
+          { id: "FSR_002", desc: "The VCU shall prohibit motive torque while charging from external power source.", asil: "A", element: "VCU", sgIds: "SG_014", decomp: false },
+          { id: "FSR_011", desc: "The MCU shall correctly determine the vehicle speed.", asil: "B", element: "MCU", sgIds: "SG_002, SG_008", decomp: false },
+          { id: "FSR_020", desc: "The BMS shall detect over-charging and cut off IGBT gate driver PWM duty when OBC is charging.", asil: "A", element: "BMS", sgIds: "SG_010", decomp: false } // Intentional HOW warning + SG_001 uncovered!
+        ]
+      }
+    };
+
+    let state = { sgs: [], fsrs: [], lastAudit: null };
+
+    function loadScenario(key) {
+      const sc = SCENARIOS[key];
+      state.sgs = sc.sgs.map(x => ({ ...x }));
+      state.fsrs = sc.fsrs.map(x => ({ ...x }));
+      renderTables();
+      runAudit();
+    }
+
+    function addSgRow() {
+      const nextNum = String(state.sgs.length + 1).padStart(3, "0");
+      state.sgs.push({ id: `SG_${nextNum}`, desc: "", asil: "B" });
+      renderTables();
+      runAudit();
+    }
+
+    function addFsrRow() {
+      const nextNum = String(state.fsrs.length + 1).padStart(3, "0");
+      state.fsrs.push({ id: `FSR_${nextNum}`, desc: "", asil: "B", element: "Subsystem", sgIds: "", decomp: false });
+      renderTables();
+      runAudit();
+    }
+
+    function deleteSg(idx) {
+      state.sgs.splice(idx, 1);
+      renderTables();
+      runAudit();
+    }
+
+    function deleteFsr(idx) {
+      state.fsrs.splice(idx, 1);
+      renderTables();
+      runAudit();
+    }
+
+    function updateSg(idx, field, val) {
+      state.sgs[idx][field] = val;
+      runAudit();
+    }
+
+    function updateFsr(idx, field, val) {
+      state.fsrs[idx][field] = val;
+      runAudit();
+    }
+
+    function escapeHtml(str) {
+      return String(str || "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
+
+    function parseSgList(str) {
+      return String(str || "")
+        .split(/[,;]+/)
+        .map(s => s.trim())
+        .filter(Boolean);
+    }
+
+    function renderTables() {
+      const sgTbody = document.getElementById("sgTableBody");
+      sgTbody.innerHTML = state.sgs.map((sg, i) => `
+        <tr>
+          <td><input type="text" value="${escapeHtml(sg.id)}" oninput="updateSg(${i}, 'id', this.value)" /></td>
+          <td><input type="text" value="${escapeHtml(sg.desc)}" placeholder="Describe safety goal (WHAT)..." oninput="updateSg(${i}, 'desc', this.value)" /></td>
+          <td>
+            <select onchange="updateSg(${i}, 'asil', this.value)">
+              ${["QM","A","B","C","D"].map(a => `<option value="${a}" ${sg.asil === a ? "selected" : ""}>${a === "QM" ? "QM" : "ASIL " + a}</option>`).join("")}
+            </select>
+          </td>
+          <td id="sg-cov-${i}"></td>
+          <td><button class="danger-sm" onclick="deleteSg(${i})" title="Remove">&times;</button></td>
+        </tr>
+      `).join("");
+
+      const fsrTbody = document.getElementById("fsrTableBody");
+      fsrTbody.innerHTML = state.fsrs.map((f, i) => `
+        <tr>
+          <td><input type="text" value="${escapeHtml(f.id)}" oninput="updateFsr(${i}, 'id', this.value)" /></td>
+          <td><input type="text" value="${escapeHtml(f.desc)}" placeholder="Describe functional safety requirement..." oninput="updateFsr(${i}, 'desc', this.value)" /></td>
+          <td>
+            <select onchange="updateFsr(${i}, 'asil', this.value)">
+              ${["QM","A","B","C","D"].map(a => `<option value="${a}" ${f.asil === a ? "selected" : ""}>${a === "QM" ? "QM" : "ASIL " + a}</option>`).join("")}
+            </select>
+          </td>
+          <td><input type="text" value="${escapeHtml(f.element)}" placeholder="e.g., Flash Controller" oninput="updateFsr(${i}, 'element', this.value)" /></td>
+          <td><input type="text" value="${escapeHtml(f.sgIds)}" placeholder="SG_001, SG_002" oninput="updateFsr(${i}, 'sgIds', this.value)" /></td>
+          <td style="text-align:center;">
+            <input type="checkbox" ${f.decomp ? "checked" : ""} onchange="updateFsr(${i}, 'decomp', this.checked)" />
+          </td>
+          <td><button class="danger-sm" onclick="deleteFsr(${i})" title="Remove">&times;</button></td>
+        </tr>
+      `).join("");
+    }
+
+    function runAudit() {
+      const findings = [];
+      const sgMap = new Map();
+      const sgCoverage = new Map();
+
+      state.sgs.forEach((sg, idx) => {
+        const id = sg.id.trim();
+        if (!id) {
+          findings.push({ type: "err", rule: "ID Missing", msg: `Safety Goal row #${idx + 1} has an empty ID.`, tip: "Assign a unique identifier (e.g., SG_001) for traceability." });
+          return;
+        }
+        if (sgMap.has(id)) {
+          findings.push({ type: "err", rule: "Duplicate ID", msg: `Duplicate Safety Goal ID detected: ${id}.`, tip: "Every Safety Goal must have a unique ID." });
+        }
+        sgMap.set(id, sg);
+        sgCoverage.set(id, []);
+      });
+
+      // Rule 2 & Rule 3 & Rule 5 on FSRs
+      const elementMap = new Map();
+
+      state.fsrs.forEach((fsr, idx) => {
+        const fid = fsr.id.trim() || `FSR_Row_${idx + 1}`;
+        const linkedIds = parseSgList(fsr.sgIds);
+
+        // Rule 2: Orphan / Broken link
+        if (linkedIds.length === 0) {
+          findings.push({
+            type: "err",
+            rule: "Rule 2: Orphan FSR",
+            msg: `${fid} does not trace to any Safety Goal.`,
+            tip: "ISO 26262-3 requires bidirectional traceability from every FSR back to at least one Safety Goal."
+          });
+        } else {
+          linkedIds.forEach(sgId => {
+            if (!sgMap.has(sgId)) {
+              findings.push({
+                type: "err",
+                rule: "Rule 2: Broken Traceability Link",
+                msg: `${fid} references non-existent Safety Goal "${sgId}".`,
+                tip: "Verify the SG ID spelling or add the missing Safety Goal."
+              });
+            } else {
+              sgCoverage.get(sgId).push(fid);
+              const parentSg = sgMap.get(sgId);
+              // Rule 3: ASIL Inheritance
+              if (ASIL_RANK[fsr.asil] < ASIL_RANK[parentSg.asil] && !fsr.decomp) {
+                findings.push({
+                  type: "err",
+                  rule: "Rule 3: ASIL Inheritance Violation",
+                  msg: `${fid} (ASIL ${fsr.asil}) is lower than linked ${sgId} (ASIL ${parentSg.asil}) without ASIL Decomposition.`,
+                  tip: "Per ISO 26262-3/9, an FSR must inherit the highest ASIL of its parent Safety Goal(s) unless formal ASIL Decomposition is documented."
+                });
+              }
+            }
+          });
+        }
+
+        // Rule 4: Element Roll-up
+        const elem = (fsr.element || "Unassigned").trim() || "Unassigned";
+        if (!elementMap.has(elem)) {
+          elementMap.set(elem, { fsrs: [], maxRank: 0 });
+        }
+        const entry = elementMap.get(elem);
+        entry.fsrs.push(fid);
+        if (ASIL_RANK[fsr.asil] > entry.maxRank) {
+          entry.maxRank = ASIL_RANK[fsr.asil];
+        }
+
+        // Rule 5: WHAT not HOW check on FSR
+        const lowerDesc = (fsr.desc || "").toLowerCase();
+        const hitKw = HOW_KEYWORDS.filter(kw => lowerDesc.includes(kw));
+        if (hitKw.length > 0) {
+          findings.push({
+            type: "warn",
+            rule: "Rule 5: 'WHAT, not HOW' Warning",
+            msg: `${fid} contains implementation-specific keyword(s): [${hitKw.join(", ")}].`,
+            tip: "FSRs should stay implementation-independent (WHAT). Move hardware/circuit/code details down to Technical/HW/SW Safety Requirements (Part 4/5/6)."
+          });
+        }
+      });
+
+      // Rule 1: SG Coverage Check & Rule 5 on SGs
+      let coveredCount = 0;
+      state.sgs.forEach((sg, idx) => {
+        const id = sg.id.trim();
+        const linked = sgCoverage.get(id) || [];
+        const covCell = document.getElementById(`sg-cov-${idx}`);
+        if (linked.length > 0) {
+          coveredCount++;
+          if (covCell) covCell.innerHTML = `<span class="pill status-pass">${linked.length} FSR(s)</span>`;
+        } else {
+          if (covCell) covCell.innerHTML = `<span class="pill status-err">Uncovered</span>`;
+          if (id) {
+            findings.push({
+              type: "err",
+              rule: "Rule 1: Uncovered Safety Goal",
+              msg: `${id} (${sg.asil === "QM" ? "QM" : "ASIL " + sg.asil}) has 0 linked FSRs.`,
+              tip: "ISO 26262-3 requires every Safety Goal to be satisfied by at least one Functional Safety Requirement."
+            });
+          }
+        }
+
+        const lowerSg = (sg.desc || "").toLowerCase();
+        const hitSgKw = HOW_KEYWORDS.filter(kw => lowerSg.includes(kw));
+        if (hitSgKw.length > 0) {
+          findings.push({
+            type: "warn",
+            rule: "Rule 5: 'WHAT, not HOW' Warning",
+            msg: `${id} contains implementation-specific keyword(s): [${hitSgKw.join(", ")}].`,
+            tip: "Safety Goals must describe vehicle/item-level behavior to avoid, independent of technical implementation."
+          });
+        }
+      });
+
+      const errCount = findings.filter(f => f.type === "err").length;
+      const warnCount = findings.filter(f => f.type === "warn").length;
+      const covPct = state.sgs.length ? Math.round((coveredCount / state.sgs.length) * 100) : 0;
+
+      state.lastAudit = { findings, elementMap, sgCoverage, errCount, warnCount, covPct, coveredCount };
+
+      // Render KPIs
+      document.getElementById("kpiGrid").innerHTML = `
+        <div class="kpi-card">
+          <div class="kpi-label">Safety Goals</div>
+          <div class="kpi-value">${state.sgs.length}</div>
+          <div class="kpi-sub">${coveredCount} / ${state.sgs.length} covered</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">FSR Count</div>
+          <div class="kpi-value">${state.fsrs.length}</div>
+          <div class="kpi-sub">${elementMap.size} allocated element(s)</div>
+        </div>
+        <div class="kpi-card ${covPct === 100 ? "kpi-pass" : "kpi-err"}">
+          <div class="kpi-label">SG Coverage</div>
+          <div class="kpi-value">${covPct}%</div>
+          <div class="kpi-sub">Target: 100%</div>
+        </div>
+        <div class="kpi-card ${errCount === 0 ? "kpi-pass" : "kpi-err"}">
+          <div class="kpi-label">Compliance Errors</div>
+          <div class="kpi-value">${errCount}</div>
+          <div class="kpi-sub">${errCount === 0 ? "Gate Passed" : "Action Required"}</div>
+        </div>
+        <div class="kpi-card ${warnCount === 0 ? "kpi-pass" : "kpi-warn"}">
+          <div class="kpi-label">Style Warnings</div>
+          <div class="kpi-value">${warnCount}</div>
+          <div class="kpi-sub">WHAT vs. HOW check</div>
+        </div>
+      `;
+
+      // Render Findings
+      const fContainer = document.getElementById("findingsContainer");
+      if (findings.length === 0) {
+        fContainer.innerHTML = `
+          <div class="finding pass">
+            <div class="finding-head"><span class="finding-rule">All Automated Checks Passed</span><span class="pill status-pass">PASS</span></div>
+            <div class="finding-body">100% Safety Goal coverage, valid bidirectional traceability, consistent ASIL inheritance, and no implementation leakage detected.</div>
+          </div>
+        `;
+      } else {
+        fContainer.innerHTML = findings.map(f => `
+          <div class="finding ${f.type}">
+            <div class="finding-head">
+              <span class="finding-rule">${escapeHtml(f.rule)}</span>
+              <span class="pill ${f.type === "err" ? "status-err" : "status-warn"}">${f.type === "err" ? "ERROR" : "WARNING"}</span>
+            </div>
+            <div class="finding-body">${escapeHtml(f.msg)}</div>
+            <div class="finding-tip">${escapeHtml(f.tip)}</div>
+          </div>
+        `).join("");
+      }
+
+      // Render Element Roll-up
+      const eTbody = document.getElementById("elementTableBody");
+      const sortedElems = Array.from(elementMap.entries()).sort((a, b) => b[1].maxRank - a[1].maxRank);
+      eTbody.innerHTML = sortedElems.map(([name, info]) => {
+        const asil = RANK_TO_ASIL[info.maxRank];
+        return `
+          <tr>
+            <td><strong>${escapeHtml(name)}</strong></td>
+            <td style="color: var(--muted);">${escapeHtml(info.fsrs.join(", "))}</td>
+            <td><span class="pill pill-${asil}">${asil === "QM" ? "QM" : "ASIL " + asil}</span></td>
+          </tr>
+        `;
+      }).join("");
+
+      // Render Traceability Matrix
+      const mContainer = document.getElementById("matrixContainer");
+      if (state.sgs.length === 0 || state.fsrs.length === 0) {
+        mContainer.innerHTML = `<p class="panel-desc">Add Safety Goals and FSRs to view the traceability matrix.</p>`;
+      } else {
+        let html = `<table><thead><tr><th>SG \ FSR</th>`;
+        state.fsrs.forEach(f => { html += `<th style="text-align:center;">${escapeHtml(f.id)}</th>`; });
+        html += `</tr></thead><tbody>`;
+        state.sgs.forEach(sg => {
+          const sid = sg.id.trim();
+          html += `<tr><td><strong>${escapeHtml(sid)}</strong> <span class="pill pill-${sg.asil}">${sg.asil === "QM" ? "QM" : "ASIL " + sg.asil}</span></td>`;
+          state.fsrs.forEach(f => {
+            const links = parseSgList(f.sgIds);
+            const hit = links.includes(sid);
+            html += `<td class="${hit ? "matrix-cell-hit" : "matrix-cell-miss"}">${hit ? "&#10003;" : "&middot;"}</td>`;
+          });
+          html += `</tr>`;
+        });
+        html += `</tbody></table>`;
+        mContainer.innerHTML = html;
+      }
+    }
+
+    function openLlmModal() {
+      const sgLines = state.sgs.map(s => `- ${s.id} [ASIL ${s.asil}]: ${s.desc}`).join("\n");
+      const fsrLines = state.fsrs.map(f => `- ${f.id} [ASIL ${f.asil}] -> ${f.sgIds || "NONE"} (Element: ${f.element}, Decomposed: ${f.decomp}): ${f.desc}`).join("\n");
+      const prompt = [
+        "You are an ISO 26262 Functional Safety Reviewer (Part 3 / Part 5 / SEooC).",
+        "Please audit the following Safety Goals (SG) and Functional Safety Requirements (FSR) for:",
+        "1. Ambiguity or untestable phrasing.",
+        "2. Premature technical implementation ('HOW' leaking into 'WHAT').",
+        "3. Missing fault detection, safe state transition, or FTTI assumptions (especially for SEooC chip-level context).",
+        "4. Suggested rewrites for any weak requirements.",
+        "",
+        "### Safety Goals",
+        sgLines,
+        "",
+        "### Functional Safety Requirements",
+        fsrLines
+      ].join("\n");
+      document.getElementById("llmPromptText").value = prompt;
+      document.getElementById("llmModal").classList.add("open");
+    }
+
+    function closeLlmModal() {
+      document.getElementById("llmModal").classList.remove("open");
+    }
+
+    function copyLlmPrompt() {
+      const ta = document.getElementById("llmPromptText");
+      ta.select();
+      document.execCommand("copy");
+      alert("LLM audit prompt copied to clipboard.");
+    }
+
+    function exportMarkdownReport() {
+      if (!state.lastAudit) runAudit();
+      const { findings, elementMap, errCount, warnCount, covPct } = state.lastAudit;
+      const lines = [
+        "# ISO 26262 Requirement Traceability Audit Report",
+        `- Generated: ${new Date().toISOString()}`,
+        `- Safety Goal Coverage: **${covPct}%**`,
+        `- Errors: **${errCount}** | Warnings: **${warnCount}**`,
+        "",
+        "## Element Highest-ASIL Roll-up",
+        "| Element | Allocated FSRs | Highest ASIL |",
+        "| :--- | :--- | :--- |",
+        ...Array.from(elementMap.entries()).map(([k, v]) => `| ${k} | ${v.fsrs.join(", ")} | ${RANK_TO_ASIL[v.maxRank]} |`),
+        "",
+        "## Audit Findings",
+        ...(findings.length ? findings.map(f => `- **[${f.type.toUpperCase()}] ${f.rule}**: ${f.msg} _(${f.tip})_`) : ["- All automated checks passed."])
+      ];
+      const blob = new Blob([lines.join("\n")], { type: "text/markdown;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "iso26262_traceability_audit_report.md";
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    // Initialize with Automotive SSD SEooC scenario
+    loadScenario("seooc");
+  </script>
+</body>
+</html>
